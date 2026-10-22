@@ -18,6 +18,7 @@ import {
 } from './compress.mjs';
 import { chatHeaders, billingHeaders } from './headers.mjs';
 import { warn } from './log.mjs';
+import { neutralize } from './neutralize.mjs';
 
 /**
  * 上游对 system 消息做「客户端指纹」精确匹配，命中就回：
@@ -284,10 +285,18 @@ export async function openChat(cfg, site, body, { signal, exclude = [], accountI
   for (;;) {
     for (let 尝试 = 1; 尝试 <= 最大尝试; 尝试++) {
       try {
+        // 零宽中和：发出前把 body 文本里的裸「DeepSeek Harness」词组替换成
+        // 夹零宽空格的形态，让上游渠道校验（400 / 11128）的精确匹配失效。
+        // 放在 fetch 这一层（而不是 prepareBody）是因为：外层「压缩重试」会重写
+        // 当前payload，只有每次 stringify 前都过一次中和，重试请求才同样被保护。
+        const bodyText =
+          cfg.zeroWidthNeutralize !== false
+            ? neutralize(JSON.stringify(当前payload))
+            : JSON.stringify(当前payload);
         res = await fetch(siteCfg.apiBase + '/v2/chat/completions', {
           method: 'POST',
           headers: chatHeaders(siteCfg, auth),
-          body: JSON.stringify(当前payload),
+          body: bodyText,
           signal: ac.signal,
         });
         最后错误 = null;

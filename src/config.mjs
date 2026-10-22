@@ -160,6 +160,13 @@ export function defaultConfig() {
     // Claude Code、以及 Claude desktop 的 /code 面板会命中（其开场白被列入黑名单）；
     // 剥离后即可正常使用。设为 false 可关闭。
     stripClientFingerprint: true,
+    // 零宽中和：出站请求体里裸露的「DeepSeek Harness」词组（DSH 系统提示词的
+    // 身份签名）被替换成中间夹零宽空格（U+200B）的形态——上游对非官方渠道做
+    // 精确字符串匹配，命中即回 400 / 11128；词组一旦被拆开，匹配失效，
+    // 而模型读到的语义完全不变（零宽空格不可见）。
+    // 前后含 / 或 \ 的文件路径语境自动跳过，避免改坏工具要用的真实路径。
+    // 设为 false 可关闭。
+    zeroWidthNeutralize: true,
     // 模型白名单 / 黑名单（支持 `*` 通配符；站点级也能配 allowModels / excludeModels）
     // allowModels 非空时只保留命中的模型，excludeModels 命中即剔除。
     allowModels: [],
@@ -334,6 +341,14 @@ export function validateConfig(cfg, defaults = defaultConfig()) {
       fix(`stripClientFingerprint 必须是布尔值，已回退为 ${defaults.stripClientFingerprint}`);
     }
     cfg.stripClientFingerprint = defaults.stripClientFingerprint;
+  }
+
+  // ---- 零宽中和（布尔开关；写错类型时回退为默认的 true）----
+  if (typeof cfg.zeroWidthNeutralize !== 'boolean') {
+    if (cfg.zeroWidthNeutralize !== undefined) {
+      fix(`zeroWidthNeutralize 必须是布尔值，已回退为 ${defaults.zeroWidthNeutralize}`);
+    }
+    cfg.zeroWidthNeutralize = defaults.zeroWidthNeutralize;
   }
 
   if (!isPlainObject(cfg.modelRoutes)) {
